@@ -32,6 +32,13 @@ RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
+# Base44 sandbox only: accept the preview proxy host and trust the public
+# preview origin for CSRF (admin login). No effect when BASE44_SANDBOX != '1'.
+CSRF_TRUSTED_ORIGINS = []
+if os.environ.get('BASE44_SANDBOX') == '1':
+    ALLOWED_HOSTS += ['localhost', '127.0.0.1', '.' + os.environ['BASE44_SANDBOX_HOST_DOMAIN']]
+    CSRF_TRUSTED_ORIGINS.append('https://3000-' + os.environ['BASE44_PUBLIC_HOST_SUFFIX'])
+
 # Application definition
 
 INSTALLED_APPS = [

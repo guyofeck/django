@@ -1,0 +1,55 @@
+x-app: &app
+  image: python:3.12-slim
+  working_dir: /app
+  volumes:
+    - ./:/app
+    - venv:/venv
+  environment:
+    - DATABASE_URL=postgresql://mysite:mysite_dev_pw@db:5432/mysite
+    - PYTHONUNBUFFERED=1
+    - BASE44_SANDBOX
+    - BASE44_SANDBOX_HOST_DOMAIN
+    - BASE44_PUBLIC_HOST_SUFFIX
+
+services:
+  db:
+    image: postgres:16
+    restart: on-failure
+    environment:
+      - POSTGRES_DB=mysite
+      - POSTGRES_USER=mysite
+      - POSTGRES_PASSWORD=mysite_dev_pw
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mysite -d mysite"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    <<: *app
+    command: ["sh", "-ec", "python -m venv /venv && /venv/bin/pip install -q -r requirements.txt && exec /venv/bin/python manage.py migrate --no-input"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    <<: *app
+    restart: on-failure
+    command: ["sh", "-ec", "/venv/bin/pip install -q -r requirements.txt && exec /venv/bin/python manage.py runserver 0.0.0.0:8000"]
+    ports:
+      - "3000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  pgdata:
+  venv:
